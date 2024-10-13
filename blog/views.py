@@ -44,9 +44,9 @@ def serialize_tag(tag):
     }
 
 
-# def get_likes_count(post):
-#     """Вычисляет количество лайков у поста."""
-#     return post.likes.count
+def get_likes_count(post):
+    """Вычисляет количество лайков у поста."""
+    return post.likes.count
 
 
 def get_most_popular_posts():
