@@ -1,9 +1,61 @@
 from django.db import models
 from django.urls import reverse
 from django.contrib.auth.models import User
+from django.db.models import Count
+
+
+class PostQuerySet(models.QuerySet):
+    def year(self, year):
+        posts_at_year = self.filter(published_at__year=year).order_by('published_at')
+        return posts_at_year
+
+    def popular(self) -> 'PostQuerySet':
+        """
+        Return a QuerySet of posts sorted by the number of likes in descending order.
+
+        Returns:
+            PostQuerySet: A QuerySet of posts sorted by the number of likes in descending order.
+        """
+        posts_by_likes_count = self.annotate(likes_count=Count('likes')) \
+            .order_by('-likes_count')
+        return posts_by_likes_count
+
+    def fetch_with_comments_count(self):
+        """
+        Fetch posts with comments count.
+
+        Annotate each post object with an additional field 'comments_count' which
+        contains the number of comments for this post.
+
+        Returns:
+            list: List of post objects each annotated with 'comments_count'.
+        """
+        posts_ids = [post.id for post in self]
+        posts_with_comments_count_field = self.model.objects \
+            .filter(id__in=posts_ids) \
+            .annotate(comments_count=Count('comments'))
+        ids_and_comments_count = (posts_with_comments_count_field
+                                  .values_list('id', 'comments_count'))
+        count_for_id = dict(ids_and_comments_count)
+        for post in self:
+            post.comments_count = count_for_id[post.id]
+        return list(self)
+
+
+class TagQuerySet(models.QuerySet):
+    def popular(self):
+        """
+        Return a QuerySet of tags sorted by the number of posts in descending order.
+
+        Returns:
+            TagQuerySet: A QuerySet of tags sorted by the number of posts in descending order.
+        """
+        tags_by_post_count = self.annotate(posts_count=Count('posts')).order_by('-posts_count')
+        return tags_by_post_count
 
 
 class Post(models.Model):
+    objects = PostQuerySet.as_manager()
     title = models.CharField('Заголовок', max_length=200)
     text = models.TextField('Текст')
     slug = models.SlugField('Название в виде url', max_length=200)
@@ -38,6 +90,7 @@ class Post(models.Model):
 
 
 class Tag(models.Model):
+    objects = TagQuerySet.as_manager()
     title = models.CharField('Тег', max_length=20, unique=True)
 
     def __str__(self):
